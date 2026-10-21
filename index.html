@@ -1,1 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free Smart Bill Generator</title>
 
+<style>
+* { box-sizing: border-box; }
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f1f5f9;
+  margin: 0;
+  padding: 15px;
+  color: #1e293b;
+}
+
+.container {
+  max-width: 850px;
+  margin: auto;
+  background: white;
+  padding: 22px;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px #0001;
+}
+
+h1 {
+  text-align: center;
+  color: #075985;
+  font-size: 27px;
+}
+
+h2 {
+  font-size: 18px;
+  color: #075985;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 8px;
+}
+
+input, select, button {
+  width: 100%;
+  padding: 11px;
+  margin: 5px 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+label { font-weight: bold; font-size: 14px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+th { background: #e0f2fe; }
+
+td input, td select {
+  margin: 0;
+  min-width: 55px;
+}
+
+.total {
+  text-align: right;
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+button {
+  background: #0369a1;
+  color: white;
+  border: 0;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.secondary { background: #475569; }
+.green { background: #15803d; }
+
+#billPreview {
+  background: white;
+  padding: 15px;
+  margin-top: 20px;
+}
+
+@media(max-width: 560px) {
+  .grid { grid-template-columns: 1fr; }
+  .container { padding: 12px; }
+  h1 { font-size: 22px; }
+  th, td { padding: 5px; font-size: 12px; }
+}
+
+@media print {
+  body { background: white; padding: 0; }
+  .container { box-shadow: none; padding: 0; }
+  .no-print { display: none !important; }
+  #billPreview { margin: 0; padding: 0; }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h1>Free Smart Bill Generator</h1>
+  <p style="text-align:center">Create your bill • Download PDF • Share on WhatsApp</p>
+
+  <div class="no-print">
+    <h2>Business Details</h2>
+    <div class="grid">
+      <div>
+        <label>Business Name</label>
+        <input id="business" placeholder="Your shop/business name">
+      </div>
+      <div>
+        <label>Business Phone</label>
+        <input id="businessPhone" placeholder="Phone number">
+      </div>
+      <div>
+        <label>Business Address</label>
+        <input id="address" placeholder="Business address">
+      </div>
+      <div>
+        <label>GSTIN (if applicable)</label>
+        <input id="gstin" placeholder="GST number, if registered">
+      </div>
+    </div>
+
+    <h2>Customer Details</h2>
+    <div class="grid">
+      <div>
+        <label>Customer Name</label>
+        <input id="customer" placeholder="Customer name">
+      </div>
+      <div>
+        <label>Customer Phone (for WhatsApp)</label>
+        <input id="customerPhone" placeholder="91XXXXXXXXXX">
+      </div>
+      <div>
+        <label>Invoice Number</label>
+        <input id="invoice" placeholder="INV-001">
+      </div>
+      <div>
+        <label>Bill Date</label>
+        <input id="date" type="date">
+      </div>
+    </div>
+
+    <h2>Products / Services</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th><th>Qty</th><th>Rate (₹)</th><th>GST %</th><th>Amount (₹)</th><th>Remove</th>
+        </tr>
+      </thead>
+      <tbody id="items"></tbody>
+    </table>
+
+    <button type="button" onclick="addItem()">+ Add Item</button>
+
+    <div class="grid">
+      <div>
+        <label>Discount (₹)</label>
+        <input id="discount" type="number" min="0" value="0" oninput="calculate()">
+      </div>
+      <div>
+        <label>Notes</label>
+        <input id="notes" placeholder="Thank you for your business">
+      </div>
+    </div>
+
+    <button type="button" onclick="generateBill()">Generate Bill</button>
+    <button type="button" class="secondary" onclick="newBill()">New Bill</button>
+    <button type="button" class="green" onclick="downloadPDF()">Download / Save PDF</button>
+    <button type="button" onclick="shareWhatsApp()">Share on WhatsApp</button>
+  </div>
+
+  <div id="billPreview">
+    <p>Enter your details and click Generate Bill.</p>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const money = n => "₹" + Number(n).toFixed(2);
+
+function addItem(name="", qty=1, rate=0, gst=0) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input class="itemName" placeholder="Product/service" value="${name}"></td>
+    <td><input class="qty" type="number" min="0" step="any" value="${qty}"></td>
+    <td><input class="rate" type="number" min="0" step="any" value="${rate}"></td>
+    <td><select class="gst">
+      <option value="0">0%</option>
+      <option value="5">5%</option>
+      <option value="12">12%</option>
+      <option value="18">18%</option>
+      <option value="28">28%</option>
+    </select></td>
+    <td class="amount">₹0.00</td>
+    <td><button type="button" class="secondary remove">X</button></td>`;
+  $("items").appendChild(tr);
+  tr.querySelector(".gst").value = gst;
+  tr.querySelectorAll("input,select").forEach(el => el.addEventListener("input", calculate));
+  tr.querySelector(".remove").addEventListener("click", () => {
+    tr.remove();
+    calculate();
+  });
+  calculate();
+}
+
+function getTotals() {
+  let subtotal = 0, tax = 0;
+  document.querySelectorAll("#items tr").forEach(tr => {
+    const qty = Math.max(0, Number(tr.querySelector(".qty").value) || 0);
+    const rate = Math.max(0, Number(tr.querySelector(".rate").value) || 0);
+    const gst = Math.max(0, Number(tr.querySelector(".gst").value) || 0);
+    const base = qty * rate;
+    subtotal += base;
+    tax += base * gst / 100;
+    tr.querySelector(".amount").textContent = money(base + base * gst / 100);
+  });
+  const discount = Math.max(0, Number($("discount").value) || 0);
+  return {subtotal, tax, discount, total: Math.max(0, subtotal + tax - discount)};
+}
+
+function calculate() {
+  const t = getTotals();
+  // Live calculations are reflected when the bill is generated.
+}
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+  })[c]);
+}
+
+function generateBill() {
+  const t = getTotals();
+  const business = escapeHTML($("business").value || "Business Name");
+  const address = escapeHTML($("address").value);
+  const phone = escapeHTML($("businessPhone").value);
+  const gstin = escapeHTML($("gstin").value);
+  const customer = escapeHTML($("customer").value || "Customer");
+  const invoice = escapeHTML($("invoice").value || "INV-001");
+  const date = escapeHTML($("date").value);
+  const notes = escapeHTML($("notes").value || "Thank you for your business");
+  let rows = "";
+
+  document.querySelectorAll("#items tr").forEach(tr => {
+    const name = escapeHTML(tr.querySelector(".itemName").value);
+    const qty = Number(tr.querySelector(".qty").value) || 0;
+    const rate = Number(tr.querySelector(".rate").value) || 0;
+    const gst = Number(tr.querySelector(".gst").value) || 0;
+    const base = qty * rate;
+    rows += `<tr><td>${name}</td><td>${qty}</td><td>${money(rate)}</td>
+    <td>${gst}%</td><td>${money(base + base*gst/100)}</td></tr>`;
+  });
+
+  $("billPreview").innerHTML = `
+    <h2 style="text-align:center">${business}</h2>
+    <p style="text-align:center">${address}<br>${phone ? "Phone: "+phone : ""}<br>${gstin ? "GSTIN: "+gstin : ""}</p>
+    <hr>
+    <p><b>Invoice:</b> ${invoice} &nbsp; <b>Date:</b> ${date}</p>
+    <p><b>Customer:</b> ${customer}</p>
+    <table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>GST</th><th>Amount</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="total">
+      Subtotal: ${money(t.subtotal)}<br>
+      GST: ${money(t.tax)}<br>
+      Discount: ${money(t.discount)}<br>
+      <b>Grand Total: ${money(t.total)}</b>
+    </div>
+    <p>${notes}</p>
+    <p style="text-align:center">Thank you!</p>`;
+}
+
+function downloadPDF() {
+  generateBill();
+  window.print();
+}
+
+function shareWhatsApp() {
+  generateBill();
+  const t = getTotals();
+  const lines = [...document.querySelectorAll("#items tr")].map(tr => {
+    const name = tr.querySelector(".itemName").value;
+    const qty = Number(tr.querySelector(".qty").value) || 0;
+    const rate = Number(tr.querySelector(".rate").value) || 0;
+    const gst = Number(tr.querySelector(".gst").value) || 0;
+    return `${name}: ${qty} x ${rate}, GST ${gst}%`;
+  });
+  const message = `Bill from ${$("business").value}\nInvoice: ${$("invoice").value}\nCustomer: ${$("customer").value}\n${lines.join("\n")}\nSubtotal: ${money(t.subtotal)}\nGST: ${money(t.tax)}\nDiscount: ${money(t.discount)}\nTOTAL: ${money(t.total)}\n\nThis is a bill summary.`;
+  const phone = $("customerPhone").value.replace(/\D/g, "");
+  const url = phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    : `https://wa.me/?text=${encodeURIComponent(message)}`;
+  window.open(url, "_blank");
+}
+
+function newBill() {
+  if (!confirm("Clear this bill and start a new one?")) return;
+  ["business","businessPhone","address","gstin","customer","customerPhone","invoice","notes"]
+    .forEach(id => $(id).value = "");
+  $("discount").value = 0;
+  $("date").value = new Date().toISOString().slice(0,10);
+  $("items").innerHTML = "";
+  addItem();
+  $("billPreview").innerHTML = "<p>Enter your details and click Generate Bill.</p>";
+}
+
+$("date").value = new Date().toISOString().slice(0,10);
+addItem();
+</script>
+</body>
+</html>
